@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>らぐらぐ遅延スタート</title>
+	<link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+	<link href="https://cdn.jsdelivr.net/npm/@mdi/font@3.x/css/materialdesignicons.min.css" rel="stylesheet">
+	<link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+</head>
+<body>
+	<style>
+		.rainbow {
+			background: linear-gradient(to right, #FFFF00, #00FFFF, #FF00FF, #FFFF00) 0% center/200%;
+			animation: rainbow 2s linear infinite;
+		}
+		@keyframes rainbow {
+			100% { background-position-x: 200%; }
+		}
+	</style>
+	<script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.js"></script>
+	<script src="https://unpkg.com/vue-toasted"></script>
+
+
+	<div id="app">
+		<v-app>
+			<v-content>
+				<v-app-bar
+					app
+					dark
+				>
+					らぐらぐ遅延スタート
+				</v-app-bar>
+				<v-container>
+					<v-row>
+						<v-col>
+							<v-card>
+								<v-toolbar dark color="orange darken-4">
+									ダッシュボード
+								</v-toolbar>
+								<v-container>
+									<v-row>
+										<v-col>
+											<canvas id="myChart"></canvas>
+										</v-col>
+									</v-row>
+								</v-container>
+							</v-card>
+						</v-col>
+					</v-row>
+					<v-row>
+						<v-col cols="12" lg="6" xl="6">
+							<v-card>
+								<v-toolbar dark color="red darken-2">
+									遅延管理コンソール
+								</v-toolbar>
+								<v-container>
+									<v-row>
+										<v-col>
+											<v-card class="pl-3" flat>
+												遅延時間(ms): 
+												<span v-text="delay"></span>
+											</v-card>
+										</v-col>
+									</v-row>
+									<v-row>
+										<v-col>
+											<v-slider
+												v-model="delay"
+												:max="maxDilay"
+												:min="minDilay"
+												:disabled="timerFlug"
+											></v-slider>
+										</v-col>
+									</v-row>
+									<v-row v-if="timerFlug">
+										<v-col>
+											<v-divider></v-divider>
+										</v-col>
+									</v-row>
+									<v-row v-if="timerFlug">
+										<v-col>
+											タイマー設定: <br>
+											<span v-text="timerStartStr"></span>
+											より
+											<span v-text="timerSpan.text"></span>おきに
+											<span v-text="timerDiff.text"></span>遅延追加
+										</v-col>
+									</v-row>
+									<v-row>
+										<!-- 遅延直接入力 -->
+										<v-col>
+											<v-dialog
+												v-model="directDelayDialog"
+												width="480px"
+											>
+												<template v-slot:activator="{ on, attrs }">
+													<v-btn @click="directDelayTemp = '' + delay" v-bind="attrs" v-on="on" :disabled="timerFlug">
+														遅延直接入力
+													</v-btn>
+												</template>
+												<v-card>
+													<v-card-title>
+														遅延直接入力
+													</v-card-title>
+
+													<v-card-text>
+														<v-card flat class="ma-5">
+															<v-form
+																ref="form"
+																v-model="directDelayValid"
+																lazy-validation
+															>
+																<v-text-field
+																  v-model="directDelayTemp"
+																	label="遅延時間(ms)"
+																	:rules="[ delayRule ]"
+																></v-text-field>
+															</v-form>
+														</v-card>
+													</v-card-text>
+
+													<v-card-actions class="justify-end">
+														<v-btn @click="cancelDirectDelay">
+															キャンセル
+														</v-btn>
+														<v-btn @click="setDelay">
+															決定
+														</v-btn>
+													</v-card-actions>
+												</v-card>
+											</v-dialog>
+										</v-col>
+
+										<!-- 遅延タイマー -->
+										<v-col>
+											<v-dialog
+												v-model="timerDialog"
+												width="480px"
+											>
+												<template v-slot:activator="{ on, attrs }">
+													<v-btn v-if="timerFlug" @click="resetTimer">
+														タイマー解除
+													</v-btn>
+													<v-btn v-else v-bind="attrs" v-on="on">
+														遅延タイマー
+													</v-btn>
+												</template>
+												<v-card>
+													<v-card-title>
+														遅延タイマー
+													</v-card-title>
+
+													<v-card-text>
+														<v-card flat class="ma-5">
+															<v-container>
+																<v-row>
+																	<v-col>
+																		<v-select
+																			label="遅延タイマー開始時間(分)"
+																			v-model="timerStart"
+																			:items="timerStartList"
+																			return-object
+																		>
+																	</v-select>
+																</v-col>
+															</v-row>
+															<v-row>
+																<v-col>
+																	<v-select
+																		label="遅延増加間隔(ms)"
+																		v-model="timerSpan"
+																		:items="timerSpanList"
+																		return-object
+																	>
+																	</v-select>
+																</v-col>
+															</v-row>
+															<v-row>
+																<v-col>
+																	<v-select
+																		label="遅延増加値(ms)"
+																		v-model="timerDiff"
+																		:items="timerDiffList"
+																		return-object
+																	>
+																	</v-select>
+																</v-col>
+															</v-row>
+														</v-container>
+													</v-card-text>
+
+													<v-card-actions class="justify-end">
+														<v-btn @click="timerDialog = false">
+															キャンセル
+														</v-btn>
+														<v-btn @click="setTimer">
+															決定
+														</v-btn>
+													</v-card-actions>
+												</v-card>
+											</v-dialog>
+										</v-col>
+									</v-row>
+								</v-container>
+							</v-card>
+						</v-col>
+						<v-col cols="12" lg="6" xl="6">
+							<v-card >
+								<v-toolbar dark color="pink lighten-1">
+									切断管理コンソール
+								</v-toolbar>
+								<v-btn v-if="proxyIsAlive" class="rainbow ma-5" x-large @click="disconnect" >
+									<b>切断</b>
+								</v-btn>
+								<v-btn v-else class="ma-5" x-large @click="connect" >
+									<b>ネットワーク復旧</b>
+								</v-btn>
+							</v-card>
+						</v-col>
+					</v-row>
+				</v-container>
+			</v-content>
+		</v-app>
+	</div>
+
+</body>
+<script>
+	Vue.use(Toasted)
+	new Vue({
+		el: '#app',
+		vuetify: new Vuetify(),
+		data: {
+			baseUri: {{ .BaseUri }},
+			chart: null, // チャートのテータ
+			minDilay: {{ .MinDelay }}, // 遅延設定最小時間
+			maxDilay: {{ .MaxDelay }}, // 遅延設定最大時間
+			delay: 0, // 遅延時間
+			labelPoint: 0, // ラベルの位置
+			pingPoint: 0, // 実測応答時間の位置
+			delayPoint: 0, // 遅延設定時間の位置
+			directDelayDialog: false, // 遅延直接入力ダイアログの開閉フラグ
+			timerDialog: false, // 遅延タイマーダイアログの開閉フラグ
+			directDelayTemp: '', // 遅延設定時間直接入力時の入力フォーム文字列
+      directDelayValid: true, // 遅延設定時間直接入力時の入力フォームバリデーションフラグ
+			timerStart: {
+				text: '1分後',
+				value: '60000'
+			},
+			timerStartList: [],
+			timerStartDate: new Date(),
+			timerSpan: {
+				text: '1秒',
+				value: '1000'
+			},
+			timerSpanList: [],
+			timerDiff: {
+				text: '10ms',
+				value: '10'
+			},
+			timerDiffList: [],
+			timerFlug: false,
+			timerId: 0,
+			proxyIsAlive: false
+		},
+		computed: {
+			// 遅延タイマーの開始時刻を表示するために使用
+			timerStartStr: function () {
+				return this.padZero(this.timerStartDate.getHours(),2) + ':' + this.padZero(this.timerStartDate.getMinutes(),2) + ':' + this.padZero(this.timerStartDate.getSeconds(),2)
+			}
+		},
+		methods: {
+			// 一定間隔で実行する処理
+			intervalProcess: function () {
+				this.measure()
+				this.chart.data.datasets[0].data.push(this.delay)
+				this.delayPoint++
+				if (!this.timerFlug) {
+					// タイマー実行中でなければ遅延を送信
+					this.submitDelay()
+				}
+				this.updateChart()
+			},
+			// チャート更新の他に呼び出す処理
+			updateChart: function (event) {
+				if (this.pingPoint >= 60 || this.delayPoint >= 60) {
+					this.chart.data.labels.push(this.makeLabel(this.labelPoint))
+					this.labelPoint++
+				}
+				this.chart.update()
+			},
+			// 遅延の直接入力をするフォームのバリデーションチェック
+			validateDirectDelay: function () {
+				this.$refs.form.validate()
+			},
+			// 遅延直接入力の入力規則
+			delayRule: function (v) {
+				if (v === '' || v === undefined) {
+					return '必須入力'
+				}
+				if (!new RegExp("^[0-9]*$").test(v)) {
+					return '正の整数を入力してください'
+				}
+				var num = Number.parseInt(v)
+				if (this.minDilay <= num && num <= this.maxDilay) {
+					return true
+				}
+				return '遅延時間(ms)は' + this.minDilay + '以上' + this.maxDilay + '以下で入力してください'
+			},
+			// 遅延直接入力のフォームをリセットする処理
+			cancelDirectDelay: function () {
+				this.$refs.form.reset()
+				this.directDelayDialog = false
+			},
+			// 遅延直接入力を遅延設定に反映する処理
+			setDelay: function () {
+				this.delay = Number.parseInt(this.directDelayTemp)
+				this.$refs.form.reset()
+				this.directDelayTemp = ''
+				this.directDelayDialog = false
+			},
+			// 遅延設定をサーバーに反映する処理
+			submitDelay: function () {
+				let delay = 0
+				if (this.delay < this.minDilay) {
+					delay = this.minDilay
+				} else if (this.delay > this.maxDilay) {
+					delay = this.maxDilay
+				} else {
+					delay = this.delay
+				}
+				
+				// GETリクエストを送信
+				const resetTimer = this.resetTimer
+				const toast = this.toast
+				const isTimer = this.isTimer
+				this.sendGet('/api/set-delay?delay=' + delay, function (request) {
+					if (request.readyState != 4) {
+						// リクエスト中
+					} else if (request.status == 200) {
+						// 成功
+					} else if (request.status == 400) {
+						// 失敗
+						toast('遅延設定に失敗しました', 'error')
+						if (isTimer()) {
+							// タイマー動作していた場合
+							toast('タイマーを強制終了します', 'error')
+							resetTimer()
+						}
+					} else {
+						// リクエスト失敗
+						toast('遅延設定に失敗しました', 'error')
+						if (isTimer()) {
+							// タイマー動作していた場合
+							toast('タイマーを強制終了します', 'error')
+							resetTimer()
+						}
+					}
+				})
+			},
+			// チャートの初期化を行う処理
+			initChart: function (ctx) {
+				var labels = []
+				var delayData = []
+				var pingData = []
+
+				// チャートのラベル(経過時間)を作成
+				for(let i = 0;i <= 60;i++) {
+					labels.push(this.makeLabel(this.labelPoint))
+					this.labelPoint++
+				}
+
+				// チャートを生成
+				this.chart = new Chart(ctx, {
+					type: 'line',
+					data: {
+						labels: labels,
+						datasets: [
+							{
+								label: '設定遅延時間(ms)',
+								data: delayData,
+								backgroundColor: '#00000000',
+          			borderColor: '#F0A000'
+							},
+							{
+								label: '実測応答時間(ms)',
+								data: pingData,
+								backgroundColor: '#00000000',
+          			borderColor: '#40C060'
+							}
+						]
+					}
+				})
+			},
+			// 入力からラベル(時間)を作成する処理
+			makeLabel: function (v) {
+				if (v % 6 == 0) {
+					return ('' + Math.floor(v / 6) + ':00')
+				} else {
+					return ('' + Math.floor(v / 6) + ':' + ((v % 6) * 10))
+				}
+			},
+			// 実測応答時間の結果をチャートに追加する処理
+			addPing: function (v) {
+				this.chart.data.datasets[1].data.push(v)
+				this.pingPoint++
+			},
+			// 実測応答時間を計測
+			measure: function () {
+				const addPing = this.addPing
+				const t = new Date()
+				this.sendGet('/api/get-delay', function (request) {
+					if (request.readyState != 4) {
+						// リクエスト中
+					} else if (request.status == 200) {
+						// 取得成功
+						addPing((new Date()).getTime() - t.getTime())
+					} else if (request.status == 400) {
+						// 実行失敗
+						addPing((new Date()).getTime() - t.getTime())
+					} else {
+						// リクエスト失敗
+					}
+				})
+			},
+			// GETリクエストを発行する処理
+			sendGet: function (uri, handler) {
+				var request = new XMLHttpRequest()
+				request.open('GET', this.baseUri + uri, true)
+				request.onreadystatechange = function () {
+					handler(request)
+				}
+				request.send(null)
+			},
+			// サーバーの遅延時間をクライアントの遅延設定に反映する処理
+			initDelay: function (request) {
+				if (request.readyState != 4) {
+					// リクエスト中
+				} else if (request.status == 200) {
+					// 取得成功
+					if (this.delayRule(request.response) == true) {
+						this.delay = Number.parseInt(request.response)
+					} else {
+						this.toast('サーバー上の遅延設定時間が異常です', 'error')
+					}
+				} else if (request.status == 400) {
+					// 実行失敗
+					this.toast('サーバー上の遅延設定時間を取得できませんでした', 'error')
+				} else {
+					// リクエスト失敗
+					this.toast('サーバー上の遅延設定時間を取得できませんでした', 'error')
+				}
+			},
+			// タイマーから遅延設定を加算する処理
+			addDelayFromTimer: function (v) {
+				this.delay += v
+				if (this.delay < this.minDilay) {
+					this.delay = this.minDilay
+				} else if (this.delay > this.maxDilay) {
+					this.delay = this.maxDilay
+				}
+			},
+			// 遅延タイマーを設定する処理
+			setTimer: function () {
+				this.timerStartDate.setTime(new Date().getTime() + this.timerStart.value)
+				this.timerId = setInterval(() => {
+					if (new Date() > this.timerStartDate) {
+						this.addDelayFromTimer(this.timerDiff.value)
+						this.submitDelay()
+					}
+				}, this.timerSpan.value)
+				this.timerFlug = true
+				this.timerDialog = false
+			},
+			// 遅延タイマーを初期化する処理
+			resetTimer: function () {
+				this.timerFlug = false
+				clearInterval(this.timerId)
+			},
+			// プロキシの起動状態をサーバーに問い合わせる処理
+			chackeProxyHandler: function (request) {
+				if (request.readyState != 4) {
+					// リクエスト中
+				} else if (request.status == 200) {
+					// 取得成功
+					this.proxyIsAlive = request.response == 'true'
+				} else if (request.status == 400) {
+					// 実行失敗
+					this.toast('プロキシの状態を確認できませんでした','error')
+				} else {
+					// リクエスト失敗
+					this.toast('プロキシの状態を確認できませんでした','error')
+				}
+			},
+			// サーバーに切断処理を要求する
+			disconnect: function () {
+				this.toast('切断中', 'info')
+				this.sendGet('/api/disconnect', this.disconnectHandler)
+			},
+			// サーバーに切断処理を要求する
+			disconnectHandler: function (request) {
+				if (request.readyState != 4) {
+					// リクエスト中
+				} else if (request.status == 200) {
+					// 取得成功
+					this.toast('処理が成功しました','success')
+					// サーバー上のプロキシ状態を取得
+					this.sendGet('/api/check-proxy', this.chackeProxyHandler)
+				} else if (request.status == 400) {
+					// 実行失敗
+					this.toast('プロキシ状態の変更ができませんでした','error')
+					// サーバー上のプロキシ状態を取得
+					this.sendGet('/api/check-proxy', this.chackeProxyHandler)
+				} else {
+					// リクエスト失敗
+					this.toast('プロキシ状態の変更ができませんでした','error')
+				}
+			},
+			// サーバーにプロキシ開始処理を要求する
+			connect: function () {
+				this.toast('ネットワーク復帰中', 'info')
+				this.sendGet('/api/connect', this.disconnectHandler)
+			},
+			// 通知を発行する処理
+			toast: function (message, type) {
+				this.$toasted.show(message, {
+					position: 'bottom-right',
+					duration: 2000,
+					fullWidth: false,
+					type: type
+				})
+			},
+			// 遅延タイマーが有効かどうかチェックする処理
+			isTimer: function () {
+				return this.timerFlug
+			},
+			// 数値をゼロ埋めして文字列に変換する処理
+			padZero: function (n, len) {
+				let nstr = n.toString()
+				let minsus
+				if (n < 0) {
+					nstr = nstr.substring(1, nstr.length)
+					minsus = '-'
+				} else {
+					minsus = ''
+				}
+
+				if (nstr.length > len) {
+					return minsus + nstr
+				}
+				return minsus + (('0'.repeat(len) + nstr).slice(-len))
+			}
+		},
+		mounted: function () {
+			const ctx = document.getElementById('myChart').getContext('2d')
+			// サーバー上の遅延設定時間の取得
+			this.sendGet('/api/get-delay', this.initDelay)
+			// サーバー上のプロキシ状態を取得
+			this.sendGet('/api/check-proxy', this.chackeProxyHandler)
+
+			// 遅延タイマーの選択肢を追加する
+			for(let i = 0; i < 60; i++) {
+				this.timerDiffList.push({
+					text: '-' + ((i + 1) * 10) + 'ms',
+					value: (i + 1) * -10
+				})
+			}
+			for(let i = 0; i < 60; i++) {
+				this.timerStartList.push({
+					text: '' + i + '分後',
+					value: i * 60 * 1000
+				})
+				this.timerSpanList.push({
+					text: '' + (i + 1) + '秒',
+					value: ((i + 1) * 1000)
+				})
+				this.timerDiffList.push({
+					text: '' + ((i + 1) * 10) + 'ms',
+					value: (i + 1) * 10
+				})
+			}
+			this.timerStart = this.timerStartList[0]
+			this.timerSpan = this.timerSpanList[0]
+			this.timerDiff = this.timerDiffList[60]
+
+			// チャート初期化
+			this.initChart(ctx)
+
+			// 10秒に1回の定期処理を開始
+			this.intervalProcess()
+			setInterval(() => {
+				this.intervalProcess()
+			}, 10000)
+		}
+	})
+
+</script>
+</html>
