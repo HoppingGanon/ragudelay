@@ -25,19 +25,19 @@ type MenuParam struct {
 
 func main() {
 	// 環境変数からポートを設定
-	sPort := os.Getenv("RAKUDELAY_PORT")
+	sPort := os.Getenv("RAGUDELAY_PORT")
 	if sPort != "" {
 		port = sPort
 	}
 
 	// 環境変数からベースURIを設定
-	sBaseUri := os.Getenv("RAKUDELAY_BASE_URI")
+	sBaseUri := os.Getenv("RAGUDELAY_BASE_URI")
 	if sBaseUri != "" {
 		baseUri = sBaseUri
 	}
 
 	// 環境変数から遅延設定最小値を設定
-	sMinDelay := os.Getenv("RAKUDELAY_MIN")
+	sMinDelay := os.Getenv("RAGUDELAY_MIN")
 	if sMinDelay != "" {
 		n, err := strconv.Atoi(sMinDelay)
 		if err == nil {
@@ -46,7 +46,7 @@ func main() {
 	}
 
 	// 環境変数から遅延設定最大値を設定
-	sMaxDelay := os.Getenv("RAKUDELAY_MAX")
+	sMaxDelay := os.Getenv("RAGUDELAY_MAX")
 	if sMinDelay != "" {
 		n, err := strconv.Atoi(sMaxDelay)
 		if err == nil {
