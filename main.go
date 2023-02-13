@@ -148,7 +148,6 @@ func getDelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 遅延設定時間を返す
-	println(fmt.Sprintf("遅延時間を設定 delay=%dms", int(num)))
 	w.WriteHeader(200)
 	fmt.Fprintf(w, fmt.Sprintf("%d", int(num)))
 }
@@ -173,9 +172,10 @@ func setDelay(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(400)
 			fmt.Fprintf(w, "遅延設定コマンドの実行に失敗しました\n"+string(out)+"\ntc qdisc change dev eth0 root netem delay "+fmt.Sprintf("%dms", delay))
-			println("遅延設定コマンドの実行に失敗しました\n" + string(out))
+			fmt.Printf("遅延設定コマンドの実行に失敗しました\n%s\n", string(out))
 			return
 		}
+		fmt.Printf("遅延を%dミリ秒に指定しました\n"+string(out), delay)
 		w.WriteHeader(200)
 		fmt.Fprintf(w, fmt.Sprintf("遅延を%dミリ秒に指定しました\n"+string(out), delay))
 		return
@@ -189,16 +189,16 @@ func setDelay(w http.ResponseWriter, r *http.Request) {
 // 切断APIのハンドラ
 // 実行するとファイアウォール拒否ルールに3128番ポートを登録(ヨシッ！)
 func disconnect(w http.ResponseWriter, r *http.Request) {
-	println("切断を受信")
+	fmt.Println("切断を受信")
 
 	st, err := checkProxyCommand()
 	if err != nil {
-		println("プロキシの状態確認に失敗しました")
+		fmt.Println("プロキシの状態確認に失敗しました")
 		w.WriteHeader(400)
 		fmt.Fprintf(w, "プロキシの状態確認に失敗しました")
 		return
 	} else if !st {
-		println("切断済みです")
+		fmt.Println("切断済みです")
 		w.WriteHeader(200)
 		fmt.Fprintf(w, "切断済みです")
 		return
@@ -206,12 +206,12 @@ func disconnect(w http.ResponseWriter, r *http.Request) {
 
 	_, err = exec.Command("iptables", "-A", "INPUT", "-p", "tcp", "--dport", "3128", "-j", "DROP").Output()
 	if err != nil {
-		println("切断に失敗しました")
+		fmt.Println("切断に失敗しました")
 		w.WriteHeader(400)
 		fmt.Fprintf(w, "切断に失敗しました")
 		return
 	}
-	println("切断ッッッッッ！！！")
+	fmt.Println("切断ッッッッッ！！！")
 	w.WriteHeader(200)
 	fmt.Fprintf(w, "切断ッッッッッ！！！")
 }
@@ -219,15 +219,15 @@ func disconnect(w http.ResponseWriter, r *http.Request) {
 // プロキシ開始APIのハンドラ
 // 実行すると全てのファイアウォールルールを消し去ることでプロキシを解放(ヨシッ！)
 func connect(w http.ResponseWriter, r *http.Request) {
-	println("プロキシ開始要求を受信")
+	fmt.Println("プロキシ開始要求を受信")
 	_, err := exec.Command("iptables", "--flush").Output()
 	if err != nil {
-		println("プロキシの開始に失敗しました")
+		fmt.Println("プロキシの開始に失敗しました")
 		w.WriteHeader(400)
 		fmt.Fprintf(w, "プロキシの開始に失敗しました")
 		return
 	}
-	println("プロキシの開始に成功しました")
+	fmt.Println("プロキシの開始に成功しました")
 	w.WriteHeader(200)
 	fmt.Fprintf(w, "プロキシの開始に成功しました")
 }
@@ -252,7 +252,7 @@ func checkProxyCommand() (bool, error) {
 
 // プロキシの状態を確認するAPIのハンドラ
 func checkPloxy(w http.ResponseWriter, r *http.Request) {
-	println("プロキシ状態確認要求を受信")
+	fmt.Println("プロキシ状態確認要求を受信")
 	st, err := checkProxyCommand()
 	if err != nil {
 		w.WriteHeader(400)
